@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRS-80 Color Computer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    /* CRT Monitor Housing */
+    .monitor {
+      background: linear-gradient(145deg, #2a2a3a 0%, #1a1a25 100%);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow:
+        0 10px 40px rgba(0,0,0,0.5),
+        inset 0 2px 0 rgba(255,255,255,0.1);
+    }
+
+    /* CRT Bezel */
+    .bezel {
+      background: #0a0a10;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow:
+        inset 0 0 30px rgba(0,0,0,0.8),
+        inset 0 0 10px rgba(0,255,0,0.05);
+    }
+
+    /* Screen container with CRT effects */
+    .screen-container {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* The actual canvas */
+    #screen {
+      display: block;
+      background: #001408;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      cursor: none;
+    }
+
+    /* CRT scan lines overlay */
+    .scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.1) 0px,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+    }
+
+    /* CRT screen curvature effect */
+    .screen-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 60%,
+        rgba(0, 0, 0, 0.3) 100%
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Screen glow */
+    .screen-container::after {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      right: -10px;
+      bottom: -10px;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(30, 255, 30, 0.05) 0%,
+        transparent 70%
+      );
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Model badge */
+    .model-badge {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 11px;
+      color: #666;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Tools panel toggle */
+    .tools-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(40, 40, 60, 0.9);
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #888;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      z-index: 100;
+    }
+
+    .tools-toggle:hover {
+      background: rgba(60, 60, 80, 0.9);
+      color: #aaa;
+    }
+
+    /* Tools panel */
+    .tools-panel {
+      position: fixed;
+      top: 50px;
+      right: 10px;
+      background: rgba(30, 30, 45, 0.95);
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 15px;
+      width: 280px;
+      max-height: calc(100vh - 70px);
+      overflow-y: auto;
+      display: none;
+      z-index: 99;
+    }
+
+    .tools-panel.visible {
+      display: block;
+    }
+
+    .tools-panel h3 {
+      color: #0f0;
+      font-size: 12px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .tools-panel button {
+      display: block;
+      width: 100%;
+      background: #2a2a4e;
+      border: 1px solid #3a3a5e;
+      color: #8f8;
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .tools-panel button:hover {
+      background: #3a3a5e;
+      border-color: #4a4a7e;
+    }
+
+    .tools-panel button.danger {
+      color: #f88;
+      border-color: #533;
+    }
+
+    .tools-panel button.danger:hover {
+      background: #433;
+    }
+
+    .tools-section {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #333;
+    }
+
+    .tools-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    /* Status indicator */
+    .status {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: #666;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    /* Help text */
+    .help-hint {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      color: #444;
+      font-size: 10px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .monitor {
+        padding: 15px;
+        border-radius: 12px;
+      }
+
+      .bezel {
+        padding: 5px;
+      }
+
+      #screen {
+        width: 320px !important;
+        height: 240px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="monitor">
+    <div class="bezel">
+      <div class="screen-container">
+        <canvas id="screen" width="512" height="384"></canvas>
+        <div class="scanlines"></div>
+      </div>
+    </div>
+    <div class="model-badge">TRS-80 Color Computer</div>
+  </div>
+
+  <button class="tools-toggle" id="toolsToggle">Tools</button>
+
+  <div class="tools-panel" id="toolsPanel">
+    <div class="tools-section">
+      <h3>Program</h3>
+      <button onclick="runProgram()">RUN</button>
+      <button onclick="listProgram()">LIST</button>
+      <button onclick="stopProgram()" class="danger">BREAK</button>
+      <button onclick="newProgram()" class="danger">NEW</button>
+    </div>
+
+    <div class="tools-section">
+      <h3>Samples</h3>
+      <button onclick="loadSample('hello')">Hello World</button>
+      <button onclick="loadSample('graphics')">Graphics Demo</button>
+      <button onclick="loadSample('circles')">Circles</button>
+      <button onclick="loadSample('mandelbrot')">Mandelbrot</button>
+      <button onclick="loadSample('music')">Music</button>
+      <button onclick="loadSample('game')">Number Game</button>
+      <button onclick="loadSample('bounce')">Bouncing Ball</button>
+      <button onclick="loadSample('breakout')">Breakout</button>
+    </div>
+
+    <div class="tools-section">
+      <h3>Storage</h3>
+      <button onclick="saveProgram()">Save to Browser</button>
+      <button onclick="loadProgram()">Load from Browser</button>
+      <button onclick="exportProgram()">Export .BAS File</button>
+      <button onclick="document.getElementById('importFile').click()">Import .BAS File</button>
+      <input type="file" id="importFile" class="file-input" accept=".bas,.txt" onchange="importProgram(event)">
+    </div>
+  </div>
+
+  <div class="status" id="status">Ready</div>
+  <div class="help-hint">Press F1 for help</div>
+
+  <script type="module">
+    // Import the emulator and display modules
+    import { CoCoEmulator, Interpreter, Lexer, Parser } from './coco-browser.js?v=13';
+    import { CoCoDisplay, COCO_PALETTE } from './coco-display.js?v=10';
+
+    // Get DOM elements
+    const canvas = document.getElementById('screen');
+    const toolsToggle = document.getElementById('toolsToggle');
+    const toolsPanel = document.getElementById('toolsPanel');
+    const statusEl = document.getElementById('status');
+
+    // Create the unified display
+    const display = new CoCoDisplay(canvas);
+
+    // Create the emulator with custom output routing
+    const emulator = new CoCoEmulator({
+      outputCallback: (text) => {
+        display.print(text);
+      },
+      inputCallback: async () => {
+        return await display.getInput('');
+      },
+      maxInstructions: 10000000,
+      maxProgramSize: 65536,
+      maxStringLength: 32768,
+      maxMemory: 1048576
+    });
+
+    // Link the display to the emulator's graphics system
+    emulator.setCanvas(canvas);
+
+    // Wire up the display to the interpreter for graphics operations
+    const graphics = emulator.getGraphics();
+
+    // Override graphics render to use our display in graphics mode
+    graphics.render = function() {
+      if (this.screenType === 0) {
+        // Text mode - use our display
+        display.setMode(0);
+        display.render();
+      } else {
+        // Graphics mode - copy buffer and render
+        display.graphicsBuffer = this.buffer;
+        display.graphicsWidth = this.width;
+        display.graphicsHeight = this.height;
+        display.backgroundColor = this.backgroundColor;
+        display.foregroundColor = this.foregroundColor;
+        display.mode = 1;
+        display.render();
+      }
+    };
+
+    // Boot sequence - show authentic startup message
+    function bootSequence() {
+      display.cls();
+      display.println('DISK EXTENDED COLOR BASIC 1.1');
+      display.println('COPYRIGHT (C) 1982 BY TANDY');
+      display.println('UNDER LICENSE FROM MICROSOFT');
+      display.println('');
+      display.println('OK');
+      display.render();
+    }
+
+    // Input buffer for command line
+    let commandBuffer = '';
+    let commandHistory = [];
+    let historyIndex = -1;
+
+    // Keyboard handler - capture all keys
+    document.addEventListener('keydown', async (e) => {
+      // Ignore if focus is on an input element
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Ctrl+C / Cmd+C - Break running program (works anytime)
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        emulator.stop();
+        display.println('');
+        display.println('^C BREAK');
+        display.println('OK');
+        display.render();
+        commandBuffer = '';
+        statusEl.textContent = 'Ready';
+        return;
+      }
+
+      // F1 - Show help
+      if (e.key === 'F1') {
+        e.preventDefault();
+        showHelp();
+        return;
+      }
+
+      // F2 - Toggle tools panel
+      if (e.key === 'F2') {
+        e.preventDefault();
+        toggleTools();
+        return;
+      }
+
+      // If in input mode, let the display handle it
+      if (display.inputMode) {
+        display.handleKeyDown(e);
+        return;
+      }
+
+      // Allow Ctrl+V / Cmd+V to pass through for paste handler
+      if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+        return; // Let the paste event fire
+      }
+
+      e.preventDefault();
+
+      // Handle special keys
+      if (e.key === 'Enter') {
+        // Execute command
+        display.printChar('\n');
+        await executeCommand(commandBuffer);
+        commandBuffer = '';
+        // Only show OK prompt if in text mode
+        if (graphics.screenType === 0) {
+          display.println('OK');
+          display.render();
+        }
+      } else if (e.key === 'Backspace') {
+        // Delete last character
+        if (commandBuffer.length > 0) {
+          commandBuffer = commandBuffer.slice(0, -1);
+          display.printChar(8);
+          display.render();
+        }
+      } else if (e.key === 'ArrowUp') {
+        // Command history up
+        if (historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          // Clear current input
+          while (commandBuffer.length > 0) {
+            commandBuffer = commandBuffer.slice(0, -1);
+            display.printChar(8);
+          }
+          // Show history item
+          commandBuffer = commandHistory[commandHistory.length - 1 - historyIndex];
+          display.print(commandBuffer);
+          display.render();
+        }
+      } else if (e.key === 'ArrowDown') {
+        // Command history down
+        if (historyIndex > 0) {
+          historyIndex--;
+          // Clear current input
+          while (commandBuffer.length > 0) {
+            commandBuffer = commandBuffer.slice(0, -1);
+            display.printChar(8);
+          }
+          // Show history item
+          commandBuffer = commandHistory[commandHistory.length - 1 - historyIndex];
+          display.print(commandBuffer);
+          display.render();
+        } else if (historyIndex === 0) {
+          historyIndex = -1;
+          while (commandBuffer.length > 0) {
+            commandBuffer = commandBuffer.slice(0, -1);
+            display.printChar(8);
+          }
+          display.render();
+        }
+      } else if (e.key === 'Escape') {
+        // Break running program
+        emulator.stop();
+        display.println('');
+        display.println('BREAK');
+        commandBuffer = '';
+      } else if (e.key.length === 1) {
+        // Regular character - convert to uppercase for authentic experience
+        const char = e.key.toUpperCase();
+        commandBuffer += char;
+        display.printChar(char);
+        display.render();
+      }
+
+      // Also feed to key buffer for INKEY$
+      display.handleKeyDown(e);
+
+      // Feed to interpreter's key buffer for INKEY$ during program execution
+      if (e.key.length === 1) {
+        emulator.keyPress(e.key.toUpperCase());
+      }
+    });
+
+    // Paste handler - allow pasting BASIC programs
+    document.addEventListener('paste', async (e) => {
+      // Ignore if focus is on an input element
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      e.preventDefault();
+      const text = e.clipboardData.getData('text');
+      if (!text) return;
+
+      // Split into lines
+      const lines = text.split(/\r?\n/);
+
+      statusEl.textContent = 'Pasting...';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        // Show the line being entered
+        display.print(line);
+        display.printChar('\n');
+        display.render();
+
+        // Execute/store the line
+        await executeCommand(line);
+
+        // Small delay to allow UI updates and break checks
+        await new Promise(r => setTimeout(r, 10));
+      }
+
+      display.println('OK');
+      display.render();
+      statusEl.textContent = 'Ready';
+    });
+
+    // Execute a BASIC command
+    async function executeCommand(command) {
+      if (!command.trim()) return;
+
+      // Add to history
+      commandHistory.push(command);
+      historyIndex = -1;
+
+      const upper = command.trim().toUpperCase();
+      statusEl.textContent = 'Executing...';
+
+      try {
+        // Handle special commands
+        if (upper === 'RUN') {
+          await emulator.run();
+        } else if (upper === 'LIST') {
+          const listing = emulator.getProgram();
+          if (listing.trim()) {
+            display.print(listing);
+          }
+        } else if (upper === 'NEW') {
+          await emulator.execute('NEW');
+          display.cls();
+        } else if (upper === 'CLS') {
+          display.cls();
+        } else {
+          // Execute as BASIC command
+          const result = await emulator.execute(command);
+          if (!result.success) {
+            display.println(result.error);
+          }
+        }
+      } catch (error) {
+        display.println('?' + error.message);
+      }
+
+      statusEl.textContent = 'Ready';
+    }
+
+    // Show help screen
+    function showHelp() {
+      display.cls();
+      display.println('TRS-80 COCO EMULATOR HELP');
+      display.println('');
+      display.println('F1     - THIS HELP SCREEN');
+      display.println('F2     - TOGGLE TOOLS PANEL');
+      display.println('CTRL+C - BREAK PROGRAM');
+      display.println('ESC    - BREAK PROGRAM');
+      display.println('UP/DN  - COMMAND HISTORY');
+      display.println('CTRL+V - PASTE PROGRAM');
+      display.println('');
+      display.println('TYPE BASIC COMMANDS DIRECTLY');
+      display.println('LINE NUMBERS STORE PROGRAM');
+      display.println('');
+      display.println('EXAMPLE:');
+      display.println('10 PRINT "HELLO"');
+      display.println('20 GOTO 10');
+      display.println('RUN');
+      display.println('');
+      display.println('PRESS ANY KEY...');
+      display.render();
+
+      // Wait for any key then return to OK prompt
+      const handler = () => {
+        document.removeEventListener('keydown', handler);
+        display.cls();
+        display.println('OK');
+        display.render();
+      };
+      document.addEventListener('keydown', handler);
+    }
+
+    // Toggle tools panel
+    function toggleTools() {
+      toolsPanel.classList.toggle('visible');
+    }
+
+    toolsToggle.addEventListener('click', toggleTools);
+
+    // Sample programs
+    const samples = {
+      hello: `10 CLS
+20 PRINT "HELLO FROM THE TRS-80 COCO!"
+30 PRINT
+40 FOR I = 1 TO 5
+50 PRINT "BASIC IS FUN! LINE"; I
+60 NEXT I
+70 PRINT
+80 PRINT "DONE!"
+90 END`,
+
+      graphics: `10 REM GRAPHICS DEMO
+20 PMODE 4,1
+30 SCREEN 1,1
+40 PCLS
+50 FOR I = 0 TO 255 STEP 8
+60 LINE (I,0)-(255-I,191),1
+70 LINE (0,I*191/255)-(255,191-I*191/255),1
+80 NEXT I
+90 END`,
+
+      circles: `10 REM CIRCLES DEMO
+20 PMODE 4,1
+30 SCREEN 1,1
+40 PCLS
+50 FOR R = 10 TO 90 STEP 10
+60 CIRCLE (128,96),R,1
+70 NEXT R
+80 END`,
+
+      mandelbrot: `10 REM MANDELBROT SET
+20 PMODE 4,1
+30 SCREEN 1,1
+40 PCLS
+50 FOR Y = 0 TO 95
+60 FOR X = 0 TO 127
+70 CR = (X - 85) / 40
+80 CI = (Y - 48) / 40
+90 ZR = 0: ZI = 0
+100 FOR I = 1 TO 20
+110 TR = ZR*ZR - ZI*ZI + CR
+120 ZI = 2*ZR*ZI + CI
+130 ZR = TR
+140 IF ZR*ZR + ZI*ZI > 4 THEN 160
+150 NEXT I
+160 IF I > 10 THEN PSET(X,Y),1
+170 NEXT X
+180 NEXT Y
+190 END`,
+
+      music: `10 REM MUSIC DEMO
+20 CLS
+30 PRINT "PLAYING A SCALE..."
+40 PLAY "T120 O4 L4"
+50 PLAY "C D E F G A B > C"
+60 PLAY "L2 C < L4 B A G F E D C"
+70 PRINT
+80 PRINT "DONE!"
+90 END`,
+
+      game: `10 REM NUMBER GUESSING GAME
+20 CLS
+30 PRINT "GUESS THE NUMBER (1-100)"
+40 PRINT
+50 N = INT(RND(100)) + 1
+60 T = 0
+70 INPUT "YOUR GUESS"; G
+80 T = T + 1
+90 IF G = N THEN 140
+100 IF G < N THEN PRINT "TOO LOW!"
+110 IF G > N THEN PRINT "TOO HIGH!"
+120 GOTO 70
+140 PRINT
+150 PRINT "CORRECT! TRIES:"; T
+160 PRINT
+170 INPUT "PLAY AGAIN (Y/N)"; A$
+180 IF A$ = "Y" THEN 20
+190 PRINT "BYE!"
+200 END`,
+
+      bounce: `10 REM BOUNCING BALL WITH SOUND
+20 PMODE 4,1
+30 SCREEN 1,1
+40 X = 128: Y = 96
+50 DX = 3: DY = 2
+60 FOR F = 1 TO 200
+70 PCLS
+80 CIRCLE (X,Y),10,1
+90 X = X + DX: Y = Y + DY
+100 IF X < 10 OR X > 245 THEN DX = -DX: SOUND 200,1
+110 IF Y < 10 OR Y > 181 THEN DY = -DY: SOUND 150,1
+120 NEXT F
+130 SCREEN 0,0
+140 CLS
+150 PRINT "ANIMATION DONE!"
+160 END`,
+
+      breakout: `10 REM *** BREAKOUT ***
+20 REM Z/X OR ,/. TO MOVE
+30 PMODE 4,1
+40 SCREEN 1,1
+50 PX = 112: PW = 30
+60 BX = 128: BY = 150
+70 DX = 2: DY = -2
+80 SC = 0: LV = 3
+90 DIM BR(5,8)
+100 FOR R = 1 TO 5
+110 FOR C = 1 TO 8
+120 BR(R,C) = 1
+130 NEXT C
+140 NEXT R
+150 NB = 40
+160 REM === MAIN LOOP ===
+170 PCLS
+180 FOR R = 1 TO 5
+190 FOR C = 1 TO 8
+200 IF BR(R,C) = 0 THEN 230
+210 X1 = (C-1)*32: Y1 = (R-1)*8 + 10
+220 LINE (X1,Y1)-(X1+30,Y1+6),1,BF
+230 NEXT C
+240 NEXT R
+250 LINE (PX,180)-(PX+PW,184),1,BF
+260 CIRCLE (BX,BY),3,1
+270 K$ = INKEY$
+280 IF K$ = "," OR K$ = "Z" THEN PX = PX - 8
+290 IF K$ = "." OR K$ = "X" THEN PX = PX + 8
+300 IF PX < 0 THEN PX = 0
+310 IF PX > 225 THEN PX = 225
+320 BX = BX + DX: BY = BY + DY
+330 IF BX < 4 OR BX > 251 THEN DX = -DX
+340 IF BY < 4 THEN DY = -DY
+350 IF BY > 176 AND BY < 185 THEN GOSUB 500
+360 IF BY < 60 THEN GOSUB 600
+370 IF BY > 192 THEN GOSUB 700
+380 IF NB = 0 THEN GOTO 420
+390 IF LV = 0 THEN GOTO 460
+400 GOTO 170
+420 SCREEN 0,0: CLS
+430 PRINT "YOU WIN! SCORE:"; SC
+440 END
+460 SCREEN 0,0: CLS
+470 PRINT "GAME OVER! SCORE:"; SC
+480 END
+500 REM PADDLE BOUNCE
+510 IF BX < PX OR BX > PX + PW THEN RETURN
+520 DY = -DY
+530 HP = BX - PX - PW/2
+540 DX = DX + SGN(HP)
+550 IF DX > 4 THEN DX = 4
+560 IF DX < -4 THEN DX = -4
+570 IF DX = 0 THEN DX = 1
+580 RETURN
+600 REM BRICK HIT
+610 BC = INT(BX/32) + 1
+620 BR = INT((BY-10)/8) + 1
+630 IF BC < 1 OR BC > 8 THEN RETURN
+640 IF BR < 1 OR BR > 5 THEN RETURN
+650 IF BR(BR,BC) = 0 THEN RETURN
+660 BR(BR,BC) = 0
+670 DY = -DY
+680 SC = SC + 10: NB = NB - 1
+690 RETURN
+700 REM BALL LOST
+710 LV = LV - 1
+720 IF LV = 0 THEN RETURN
+730 BX = 128: BY = 150
+740 DX = 2: DY = -2
+750 RETURN`
+    };
+
+    // Global functions for tools panel
+    window.runProgram = async () => {
+      statusEl.textContent = 'Running...';
+      display.println('RUN');
+      await emulator.run();
+      // Only show OK prompt if in text mode
+      if (graphics.screenType === 0) {
+        display.println('');
+        display.println('OK');
+        display.render();
+      }
+      statusEl.textContent = 'Ready';
+    };
+
+    window.listProgram = () => {
+      const listing = emulator.getProgram();
+      display.println('LIST');
+      if (listing.trim()) {
+        display.print(listing);
+      }
+      display.println('OK');
+      display.render();
+    };
+
+    window.stopProgram = () => {
+      emulator.stop();
+      display.println('');
+      display.println('BREAK');
+      display.println('OK');
+      display.render();
+      statusEl.textContent = 'Ready';
+    };
+
+    window.newProgram = () => {
+      emulator.execute('NEW');
+      display.cls();
+      display.println('OK');
+      display.render();
+    };
+
+    window.loadSample = (name) => {
+      if (samples[name]) {
+        const result = emulator.loadProgram(samples[name]);
+        display.println('PROGRAM LOADED');
+        if (result.success) {
+          display.println('TYPE RUN TO START');
+        } else {
+          display.println('?' + result.error);
+        }
+        display.println('OK');
+        display.render();
+      }
+    };
+
+    window.saveProgram = () => {
+      const name = prompt('Program name:');
+      if (name) {
+        try {
+          const programs = JSON.parse(localStorage.getItem('coco-programs') || '{}');
+          programs[name] = {
+            code: emulator.getProgram(),
+            savedAt: new Date().toISOString()
+          };
+          localStorage.setItem('coco-programs', JSON.stringify(programs));
+          display.println('SAVED: ' + name.toUpperCase());
+          display.println('OK');
+          display.render();
+        } catch (e) {
+          display.println('?SAVE ERROR');
+          display.println('OK');
+          display.render();
+        }
+      }
+    };
+
+    window.loadProgram = () => {
+      try {
+        const programs = JSON.parse(localStorage.getItem('coco-programs') || '{}');
+        const names = Object.keys(programs);
+        if (names.length === 0) {
+          display.println('NO SAVED PROGRAMS');
+          display.println('OK');
+          display.render();
+          return;
+        }
+        const name = prompt('Load program:\n' + names.join('\n'));
+        if (name && programs[name]) {
+          emulator.loadProgram(programs[name].code);
+          display.println('LOADED: ' + name.toUpperCase());
+          display.println('OK');
+          display.render();
+        }
+      } catch (e) {
+        display.println('?LOAD ERROR');
+        display.println('OK');
+        display.render();
+      }
+    };
+
+    window.exportProgram = () => {
+      const name = prompt('Filename:', 'program');
+      if (name) {
+        const code = emulator.getProgram();
+        const blob = new Blob([code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name + '.bas';
+        a.click();
+        URL.revokeObjectURL(url);
+        display.println('EXPORTED: ' + name.toUpperCase() + '.BAS');
+        display.println('OK');
+        display.render();
+      }
+    };
+
+    window.importProgram = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const code = await file.text();
+        emulator.loadProgram(code);
+        display.println('IMPORTED: ' + file.name.toUpperCase());
+        display.println('OK');
+        display.render();
+      } catch (e) {
+        display.println('?IMPORT ERROR');
+        display.println('OK');
+        display.render();
+      }
+      event.target.value = '';
+    };
+
+    // Initialize
+    bootSequence();
+
+    // Expose for debugging
+    window.emulator = emulator;
+    window.display = display;
+    window.graphics = graphics;
+
+    // Focus handling - make sure canvas stays "focused"
+    canvas.setAttribute('tabindex', '0');
+    canvas.focus();
+    canvas.addEventListener('click', () => canvas.focus());
+  </script>
+</body>
+</html>
