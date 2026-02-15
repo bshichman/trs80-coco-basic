@@ -6,6 +6,10 @@
 
 A complete emulator for the TRS-80 Color Computer (CoCo) Extended Color BASIC, written in JavaScript. Run classic BASIC programs in your browser with authentic graphics and sound.
 
+![CoCo Emulator Screenshot](screenshot/coco-shot.jpeg)
+*The TRS-80 Color Computer Extended BASIC emulator in action*
+
+
 ## About the TRS-80 Color Computer
 
 The **TRS-80 Color Computer** (affectionately known as the "CoCo") was a home computer produced by Tandy Corporation from 1980 to 1991. It was one of the most popular home computers of the early 1980s, competing with the Commodore 64 and Apple II.
